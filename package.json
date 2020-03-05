@@ -1,0 +1,15 @@
+{
+  "name": "mvl-botcms-users-semis",
+  "version": "1.0.0",
+  "description": "",
+  "main": "lib/botcmsusers.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mvloader": "^1.0.3"
+  }
+}

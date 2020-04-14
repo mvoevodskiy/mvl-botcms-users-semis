@@ -2,7 +2,7 @@
   "name": "mvl-botcms-users-semis",
   "version": "1.0.2",
   "description": "",
-  "main": "lib/mvlBotCMSUsers.js",
+  "main": "src/mvlBotCMSUsers.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

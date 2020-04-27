@@ -1,26 +1,23 @@
 module.exports = (Sequelize) => {
     return [
         {
-            userId: Sequelize.INTEGER,
-            userMasterId: Sequelize.INTEGER,
+            chatId: Sequelize.INTEGER,
             username: Sequelize.STRING,
+            title: Sequelize.STRING,
             fullname: Sequelize.STRING,
             firstName: Sequelize.STRING,
             lastName: Sequelize.STRING,
+            description: Sequelize.STRING,
+            inviteLink: Sequelize.STRING,
             bridge: Sequelize.STRING(20),
             driver: Sequelize.STRING,
         },
         {},
         {
-            belongsTo: [
-                {
-                    model: 'mvlUser',
-                },
-            ],
             belongsToMany: [
                 {
-                    model: 'mvlBotCMSChat',
-                    as: 'Chats',
+                    model: 'mvlBotCMSUser',
+                    as: 'Users',
                     through: {
                         model: 'mvlBotCMSChatMember'
                     }

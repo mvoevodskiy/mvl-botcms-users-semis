@@ -16,7 +16,9 @@ class mvlBotCMSUsers extends MVLoaderBase {
                     },
                     DBHandler: {
                         models: {
-                            mvlBotCMSUser: require('./model/botcmsuser')
+                            mvlBotCMSUser: require('./model/botcmsuser'),
+                            mvlBotCMSChat: require('./model/botcmschat'),
+                            mvlBotCMSChatMember: require('./model/botcmschatmember'),
                         }
                     }
                 }

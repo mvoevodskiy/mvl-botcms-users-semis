@@ -7,6 +7,10 @@ module.exports = (Sequelize) => {
             fullname: Sequelize.STRING,
             firstName: Sequelize.STRING,
             lastName: Sequelize.STRING,
+            accessHash: {
+                type: Sequelize.STRING,
+                defaultValue: '',
+            },
             bridge: Sequelize.STRING(20),
             driver: Sequelize.STRING,
         },
@@ -24,6 +28,12 @@ module.exports = (Sequelize) => {
                     through: {
                         model: 'mvlBotCMSChatMember'
                     }
+                }
+            ],
+            hasMany: [
+                {
+                    model: 'mvlBotCMSChatMember',
+                    as: 'ChatMembers',
                 }
             ]
         }

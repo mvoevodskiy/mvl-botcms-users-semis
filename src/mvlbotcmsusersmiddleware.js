@@ -42,11 +42,11 @@ class mvlBotCMSUsersMiddleware {
         localUser = await this.Model.findOne({
             where: {
                 userId: requestUserId,
-                driver: ctx.Bridge.driverName
+                bridge: ctx.Bridge.name
             }
         });
         if (ctx.BC.MT.empty(localUser)) {
-            let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx.Message.chat.id);
+            let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx);
             // console.log(userInfo);
             localUser = await this.Model.create({
                 userId: userInfo.id,
@@ -61,6 +61,24 @@ class mvlBotCMSUsersMiddleware {
             });
         }
         if (!ctx.BC.MT.empty(localUser)) {
+            // console.log('BOTCMS USER MW. SAVE USER. HASH L ', localUser.accessHash, ' T ', ctx.Message.sender.accessHash)
+            let changed = false;
+            if (ctx.Message.sender.accessHash !== '' && localUser.accessHash !== ctx.Message.sender.accessHash) {
+                localUser.accessHash = ctx.Message.sender.accessHash;
+                changed = true;
+            }
+            if (localUser.fullname === null) {
+                let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx);
+                localUser.username = userInfo.username;
+                localUser.fullname = userInfo.full_name;
+                localUser.firstName = userInfo.first_name;
+                localUser.lastName = userInfo.last_name;
+                localUser.type = userInfo.type;
+                changed = true;
+            }
+            if (changed) {
+                await localUser.save();
+            }
             ctx.singleSession.mvlBotCMSUser = localUser;
         }
     };
@@ -75,12 +93,13 @@ class mvlBotCMSUsersMiddleware {
         localChat = await this.DB.models.mvlBotCMSChat.findOne({
             where: {
                 chatId: requestChatId,
-                driver: ctx.Bridge.driverName
-            }
+                bridge: ctx.Bridge.name
+            },
+            // raw: true,
         });
         if (ctx.BC.MT.empty(localChat)) {
-            let chatInfo = await ctx.Bridge.fetchChatInfo(requestChatId, ctx.Message.chat.id);
-            console.log(chatInfo);
+            let chatInfo = await ctx.Bridge.fetchChatInfo(requestChatId, ctx);
+            // console.log(chatInfo);
             localChat = await this.DB.models.mvlBotCMSChat.create({
                 chatId: chatInfo.id,
                 username: ctx.BC.MT.extract('username', chatInfo, null),
@@ -97,6 +116,11 @@ class mvlBotCMSUsersMiddleware {
             });
         }
         if (!ctx.BC.MT.empty(localChat)) {
+            // console.log('BOTCMS USER MW. SAVE CHAT. HASH L ', localChat.accessHash, ' T ', ctx.Message.chat.accessHash)
+            if (ctx.Message.chat.accessHash !== '' && localChat.accessHash !== ctx.Message.chat.accessHash) {
+                localChat.accessHash = ctx.Message.chat.accessHash;
+                await localChat.save();
+            }
             ctx.singleSession.mvlBotCMSChat = localChat;
         }
     };
@@ -108,7 +132,10 @@ class mvlBotCMSUsersMiddleware {
                     mvlBotCMSUserId: ctx.singleSession.mvlBotCMSUser.id,
                     mvlBotCMSChatId: ctx.singleSession.mvlBotCMSChat.id,
                 },
-            });
+            })
+                .then(result => {
+                    ctx.singleSession.mvlBotCMSChatMember = result[0];
+                });
         }
     }
 }

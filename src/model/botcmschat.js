@@ -1,7 +1,7 @@
 module.exports = (Sequelize) => {
     return [
         {
-            chatId: Sequelize.INTEGER,
+            chatId: Sequelize.STRING,
             username: Sequelize.STRING,
             title: Sequelize.STRING,
             fullname: Sequelize.STRING,

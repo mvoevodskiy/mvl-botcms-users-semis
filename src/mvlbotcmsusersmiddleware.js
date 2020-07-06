@@ -34,6 +34,15 @@ class mvlBotCMSUsersMiddleware {
 
     __saveUser = async ctx => {
         let localUser;
+        let senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1);
+        if (senderId === -1 ) {
+            localUser = this.Model.build({
+                id: -1,
+                fullname: '(anonymous)',
+            });
+            ctx.singleSession.mvlBotCMSUser = localUser;
+            return;
+        }
         let requestUserId = ctx.Message.sender.id === ctx.BC.SELF_SEND ? 0 : ctx.Message.sender.id;
         if (requestUserId === 0) {
             let selfUserInfo = await ctx.Bridge.fetchUserInfo();
@@ -126,7 +135,7 @@ class mvlBotCMSUsersMiddleware {
     };
 
     __saveMember  = async ctx => {
-        if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser) && !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat)) {
+        if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser) && ctx.singleSession.mvlBotCMSUser.id !== -1 && !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat)) {
             await this.DB.models.mvlBotCMSChatMember.findOrCreate({
                 where: {
                     mvlBotCMSUserId: ctx.singleSession.mvlBotCMSUser.id,

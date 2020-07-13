@@ -57,17 +57,22 @@ class mvlBotCMSUsersMiddleware {
         if (ctx.BC.MT.empty(localUser)) {
             let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx);
             // console.log(userInfo);
-            localUser = await this.Model.create({
-                userId: userInfo.id,
-                username: userInfo.username,
-                fullname: userInfo.full_name,
-                firstName: userInfo.first_name,
-                lastName: userInfo.last_name,
-                type: userInfo.type,
-                bridge: ctx.Bridge.name,
-                driver: ctx.Bridge.driverName,
-                // createdon: Date.now() / 1000 | 0,
+            localUser = await this.Model.findOrCreate({
+                where: {
+                    userId: userInfo.id,
+                    bridge: ctx.Bridge.name,
+                    driver: ctx.Bridge.driverName,
+                    // createdon: Date.now() / 1000 | 0,
+                },
+                defaults: {
+                    username: userInfo.username,
+                    fullname: userInfo.full_name,
+                    firstName: userInfo.first_name,
+                    lastName: userInfo.last_name,
+                    type: userInfo.type,
+                }
             });
+            localUser = localUser[0];
         }
         if (!ctx.BC.MT.empty(localUser)) {
             // console.log('BOTCMS USER MW. SAVE USER. HASH L ', localUser.accessHash, ' T ', ctx.Message.sender.accessHash)
@@ -109,33 +114,39 @@ class mvlBotCMSUsersMiddleware {
         if (ctx.BC.MT.empty(localChat)) {
             let chatInfo = await ctx.Bridge.fetchChatInfo(requestChatId, ctx);
             // console.log(chatInfo);
-            localChat = await this.DB.models.mvlBotCMSChat.create({
-                chatId: chatInfo.id,
-                username: ctx.BC.MT.extract('username', chatInfo, null),
-                title: ctx.BC.MT.extract('title', chatInfo, null),
-                fullname: ctx.BC.MT.extract('full_name', chatInfo, null),
-                firstName: ctx.BC.MT.extract('first_name', chatInfo, null),
-                lastName: ctx.BC.MT.extract('last_name', chatInfo, null),
-                type: ctx.BC.MT.extract('type', chatInfo, null),
-                description: ctx.BC.MT.extract('description', chatInfo, null),
-                inviteLink: ctx.BC.MT.extract('invite_link', chatInfo, null),
-                bridge: ctx.Bridge.name,
-                driver: ctx.Bridge.driverName,
-                // createdon: Date.now() / 1000 | 0,
+            localChat = await this.DB.models.mvlBotCMSChat.findOrCreate({
+                where: {
+                    chatId: chatInfo.id,
+                    bridge: ctx.Bridge.name,
+                    driver: ctx.Bridge.driverName,
+                    // createdon: Date.now() / 1000 | 0,
+                },
+                defaults: {
+                    username: ctx.BC.MT.extract('username', chatInfo, null),
+                    title: ctx.BC.MT.extract('title', chatInfo, null),
+                    fullname: ctx.BC.MT.extract('full_name', chatInfo, null),
+                    firstName: ctx.BC.MT.extract('first_name', chatInfo, null),
+                    lastName: ctx.BC.MT.extract('last_name', chatInfo, null),
+                    type: ctx.BC.MT.extract('type', chatInfo, null),
+                    description: ctx.BC.MT.extract('description', chatInfo, null),
+                    inviteLink: ctx.BC.MT.extract('invite_link', chatInfo, null),
+                }
             });
+            localChat = localChat[0];
         }
         if (!ctx.BC.MT.empty(localChat)) {
             // console.log('BOTCMS USER MW. SAVE CHAT. HASH L ', localChat.accessHash, ' T ', ctx.Message.chat.accessHash)
-            if (ctx.Message.chat.accessHash !== '' && localChat.accessHash !== ctx.Message.chat.accessHash) {
-                localChat.accessHash = ctx.Message.chat.accessHash;
-                await localChat.save();
-            }
+            // if (ctx.Message.chat.accessHash !== '' && localChat.accessHash !== ctx.Message.chat.accessHash) {
+            //     localChat.accessHash = ctx.Message.chat.accessHash;
+            //     await localChat.save();
+            // }
             ctx.singleSession.mvlBotCMSChat = localChat;
         }
     };
 
     __saveMember  = async ctx => {
         if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser) && ctx.singleSession.mvlBotCMSUser.id !== -1 && !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat)) {
+            // console.log(ctx.singleSession.mvlBotCMSUser);
             await this.DB.models.mvlBotCMSChatMember.findOrCreate({
                 where: {
                     mvlBotCMSUserId: ctx.singleSession.mvlBotCMSUser.id,
@@ -144,6 +155,9 @@ class mvlBotCMSUsersMiddleware {
             })
                 .then(result => {
                     ctx.singleSession.mvlBotCMSChatMember = result[0];
+                })
+                .catch(e => {
+                    console.error(e, ctx.singleSession.mvlBotCMSUser.id, ctx.singleSession.mvlBotCMSUser);
                 });
         }
     }

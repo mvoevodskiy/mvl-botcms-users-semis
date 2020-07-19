@@ -48,31 +48,35 @@ class mvlBotCMSUsersMiddleware {
             let selfUserInfo = await ctx.Bridge.fetchUserInfo();
             requestUserId = selfUserInfo.id;
         }
-        localUser = await this.Model.findOne({
-            where: {
-                userId: requestUserId,
-                bridge: ctx.Bridge.name
-            }
-        });
+        if (requestUserId !== undefined) {
+            localUser = await this.Model.findOne({
+                where: {
+                    userId: requestUserId,
+                    bridge: ctx.Bridge.name
+                }
+            });
+        }
         if (ctx.BC.MT.empty(localUser)) {
             let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx);
             // console.log(userInfo);
-            localUser = await this.Model.findOrCreate({
-                where: {
-                    userId: userInfo.id,
-                    bridge: ctx.Bridge.name,
-                    driver: ctx.Bridge.driverName,
-                    // createdon: Date.now() / 1000 | 0,
-                },
-                defaults: {
-                    username: userInfo.username,
-                    fullname: userInfo.full_name,
-                    firstName: userInfo.first_name,
-                    lastName: userInfo.last_name,
-                    type: userInfo.type,
-                }
-            });
-            localUser = localUser[0];
+            if (!ctx.BC.MT.empty(localUser) && localUser.id !== undefined) {
+                localUser = await this.Model.findOrCreate({
+                    where: {
+                        userId: userInfo.id,
+                        bridge: ctx.Bridge.name,
+                        driver: ctx.Bridge.driverName,
+                        // createdon: Date.now() / 1000 | 0,
+                    },
+                    defaults: {
+                        username: userInfo.username,
+                        fullname: userInfo.full_name,
+                        firstName: userInfo.first_name,
+                        lastName: userInfo.last_name,
+                        type: userInfo.type,
+                    }
+                });
+                localUser = localUser[0];
+            }
         }
         if (!ctx.BC.MT.empty(localUser)) {
             // console.log('BOTCMS USER MW. SAVE USER. HASH L ', localUser.accessHash, ' T ', ctx.Message.sender.accessHash)
@@ -93,8 +97,14 @@ class mvlBotCMSUsersMiddleware {
             if (changed) {
                 await localUser.save();
             }
-            ctx.singleSession.mvlBotCMSUser = localUser;
+        } else {
+            localUser = await this.Model.build({
+                userId: -1,
+                bridge: ctx.Bridge.name,
+                driver: ctx.Bridge.driverName,
+            });
         }
+        ctx.singleSession.mvlBotCMSUser = localUser;
     };
 
     __saveChat = async ctx => {

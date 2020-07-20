@@ -35,6 +35,7 @@ class mvlBotCMSUsersMiddleware {
     __saveUser = async ctx => {
         let localUser;
         let senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1);
+        console.log(ctx.Message);
         if (senderId === -1 ) {
             localUser = this.Model.build({
                 id: -1,
@@ -52,14 +53,15 @@ class mvlBotCMSUsersMiddleware {
             localUser = await this.Model.findOne({
                 where: {
                     userId: requestUserId,
-                    bridge: ctx.Bridge.name
+                    bridge: ctx.Bridge.name,
+                    driver: ctx.Bridge.driverName,
                 }
             });
         }
         if (ctx.BC.MT.empty(localUser)) {
             let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx);
             // console.log(userInfo);
-            if (!ctx.BC.MT.empty(localUser) && localUser.id !== undefined) {
+            if (!ctx.BC.MT.empty(userInfo) && userInfo.id !== undefined) {
                 localUser = await this.Model.findOrCreate({
                     where: {
                         userId: userInfo.id,
@@ -99,6 +101,7 @@ class mvlBotCMSUsersMiddleware {
             }
         } else {
             localUser = await this.Model.build({
+                id: -1,
                 userId: -1,
                 bridge: ctx.Bridge.name,
                 driver: ctx.Bridge.driverName,

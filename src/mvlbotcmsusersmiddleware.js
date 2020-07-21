@@ -35,8 +35,8 @@ class mvlBotCMSUsersMiddleware {
     __saveUser = async ctx => {
         let localUser;
         let senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1);
-        console.log(ctx.Message);
-        if (senderId === -1 ) {
+        // console.log(ctx.Message);
+        if (senderId === -1 || senderId === null) {
             localUser = this.Model.build({
                 id: -1,
                 fullname: '(anonymous)',
@@ -102,7 +102,6 @@ class mvlBotCMSUsersMiddleware {
         } else {
             localUser = await this.Model.build({
                 id: -1,
-                userId: -1,
                 bridge: ctx.Bridge.name,
                 driver: ctx.Bridge.driverName,
             });

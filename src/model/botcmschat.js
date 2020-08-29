@@ -23,13 +23,14 @@ module.exports = (Sequelize) => {
         {
             indexes: [
                 {
-                    fields: ['chatId']
+                    fields: ['chatId', 'bridge'],
+                    unique: true
                 },
                 {
                     fields: ['username']
                 },
                 {
-                    fields: ['bridge', 'driver']
+                    fields: ['driver']
                 }
             ]
         },

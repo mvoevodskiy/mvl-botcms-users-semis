@@ -62,25 +62,21 @@ class mvlBotCMSUsersMiddleware {
                 }
             });
         }
-        if (ctx.BC.MT.empty(localUser)) {
+        if (ctx.BC.MT.empty(localUser) || this.__isOld(localUser.updatedAt) || localUser.fullname === null) {
             let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx);
             // console.log(userInfo);
             if (!ctx.BC.MT.empty(userInfo) && userInfo.id !== undefined) {
-                localUser = await this.Model.findOrCreate({
-                    where: {
-                        userId: userInfo.id,
-                        bridge: ctx.Bridge.name,
-                        driver: ctx.Bridge.driverName,
-                        // createdon: Date.now() / 1000 | 0,
-                    },
-                    defaults: {
-                        username: userInfo.username,
-                        fullname: userInfo.full_name,
-                        firstName: userInfo.first_name,
-                        lastName: userInfo.last_name,
-                        type: userInfo.type,
-                    }
-                });
+                localUser = await this.Model.upsert({
+                    userId: userInfo.id,
+                    bridge: ctx.Bridge.name,
+                    driver: ctx.Bridge.driverName,
+                    username: userInfo.username,
+                    fullname: userInfo.full_name,
+                    firstName: userInfo.first_name,
+                    lastName: userInfo.last_name,
+                    type: userInfo.type,
+                })
+                  .catch((e) => console.error('ERROR WHILE UPSERT mvlBotCMSUser: ', e));
                 localUser = localUser[0];
             }
         }
@@ -89,20 +85,12 @@ class mvlBotCMSUsersMiddleware {
             let changed = false;
             if (ctx.Message.sender.accessHash !== '' && localUser.accessHash !== ctx.Message.sender.accessHash) {
                 localUser.accessHash = ctx.Message.sender.accessHash;
-                changed = true;
+                localUser.changed('updatedAt', true)
             }
-            if (this.__isOld(localUser.updatedAt) || localUser.fullname === null) {
-                let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx);
-                localUser.username = userInfo.username;
-                localUser.fullname = userInfo.full_name;
-                localUser.firstName = userInfo.first_name;
-                localUser.lastName = userInfo.last_name;
-                localUser.type = userInfo.type;
-                changed = true;
+            if (this.__isOld(localUser.updatedAt)) {
+                localUser.changed('updatedAt', true)
             }
-            if (changed) {
-                await localUser.save();
-            }
+            await localUser.save().catch((e) => console.error('ERROR WHILE LOCAL USER SAVE:', e))
         } else {
             localUser = await this.Model.build({
                 id: -1,

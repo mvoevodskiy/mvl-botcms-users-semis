@@ -20,7 +20,19 @@ module.exports = (Sequelize) => {
             bridge: Sequelize.STRING(20),
             driver: Sequelize.STRING,
         },
-        {},
+        {
+            indexes: [
+                {
+                    fields: ['chatId']
+                },
+                {
+                    fields: ['username']
+                },
+                {
+                    fields: ['bridge', 'driver']
+                }
+            ]
+        },
         {
             belongsToMany: [
                 {

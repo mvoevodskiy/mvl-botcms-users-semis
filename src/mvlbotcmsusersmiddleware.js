@@ -138,9 +138,9 @@ class mvlBotCMSUsersMiddleware {
         })
           .catch((e) => console.error('ERROR WHILE FIND mvlBotCMSChat: ', e));
         if (ctx.BC.MT.empty(localChat) || this.__isOld(localChat.updatedAt)) {
-            // console.log(chatInfo);
             let chatInfo = await fetchChatInfo(requestChatId, ctx);
-            if (chatInfo.id) {
+            // console.log(chatInfo);
+            if (chatInfo.chatId) {
                 chatInfo.bridge = ctx.Bridge.name
                 chatInfo.driver = ctx.Bridge.driverName
 
@@ -161,7 +161,11 @@ class mvlBotCMSUsersMiddleware {
     };
 
     __saveMember  = async ctx => {
-        if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser) && ctx.singleSession.mvlBotCMSUser.id !== -1 && !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat)) {
+        if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser)
+          && ctx.singleSession.mvlBotCMSUser.id !== -1
+          && !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat)
+          && ctx.singleSession.mvlBotCMSChat.id !== -1
+        ) {
             // console.log(ctx.singleSession.mvlBotCMSUser);
             await this.DB.models.mvlBotCMSChatMember.findOrCreate({
                 where: {

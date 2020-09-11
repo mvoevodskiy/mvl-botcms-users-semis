@@ -4,7 +4,7 @@ class mvlBotCMSUsersMiddleware {
     DB = null;
 
     config = {
-        dataTimeout: 10 * 60 * 1000
+        dataTimeout: 5 * 60 * 1000
     }
 
     constructor (BotCMS) {
@@ -66,7 +66,18 @@ class mvlBotCMSUsersMiddleware {
             let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx);
             // console.log(userInfo);
             if (!ctx.BC.MT.empty(userInfo) && userInfo.id !== undefined) {
-                localUser = await this.Model.upsert({
+
+                localUser = await this.DB.models.mvlBotCMSUser.findOne({
+                    where: {
+                        userId: requestUserId,
+                        bridge: ctx.Bridge.name
+                    },
+                    // raw: true,
+                })
+                if (!localUser) {
+                    localUser = await this.DB.models.mvlBotCMSUser.build()
+                }
+                await localUser.set({
                     userId: userInfo.id,
                     bridge: ctx.Bridge.name,
                     driver: ctx.Bridge.driverName,
@@ -76,8 +87,7 @@ class mvlBotCMSUsersMiddleware {
                     lastName: userInfo.last_name,
                     type: userInfo.type,
                 })
-                  .catch((e) => console.error('ERROR WHILE UPSERT mvlBotCMSUser: ', e));
-                localUser = localUser[0];
+                await localUser.save().catch((e) => console.error('ERROR WHILE SAVING BOTCMS USER:', e))
             }
         }
         if (!ctx.BC.MT.empty(localUser)) {
@@ -144,9 +154,18 @@ class mvlBotCMSUsersMiddleware {
                 chatInfo.bridge = ctx.Bridge.name
                 chatInfo.driver = ctx.Bridge.driverName
 
-                localChat = await this.DB.models.mvlBotCMSChat.upsert(chatInfo)
-                  .catch((e) => console.error('ERROR WHILE UPSERT mvlBotCMSChat: ', e));
-                localChat = localChat[0];
+                localChat = await this.DB.models.mvlBotCMSChat.findOne({
+                    where: {
+                        chatId: requestChatId,
+                        bridge: ctx.Bridge.name
+                    },
+                    // raw: true,
+                })
+                if (!localChat) {
+                    localChat = await this.DB.models.mvlBotCMSChat.build()
+                }
+                await localChat.set(chatInfo)
+                await localChat.save()
             }
         }
         if (!ctx.BC.MT.empty(localChat)) {

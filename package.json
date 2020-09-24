@@ -10,6 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "mvloader": "^1.0.3"
+    "mvloader": "^1.0.6"
   }
 }

@@ -1,7 +1,11 @@
+/**
+ * @class Middleware for BotCMS to control users
+ * @param {import('mvl-db-handler').Sequelize} DB
+ */
 class mvlBotCMSUsersMiddleware {
-
   constructor (BotCMS) {
     this.BotCMS = BotCMS
+    /** @param {import('mvl-db-handler').Sequelize} */
     this.DB = null
     this.config = {
       dataTimeout: 5 * 60 * 1000
@@ -10,20 +14,19 @@ class mvlBotCMSUsersMiddleware {
     this.successDB = (target) => {
       return next => () => {
         this.DB = target.DB
-        this.Model = this.DB.models.mvlBotCMSUser
         return next()
       }
     }
 
-    this.failDB = (target) => {
-      return next => error => {
+    this.failDB = () => {
+      return () => error => {
         console.error('BOTCMS USERS. DB FAIL. FATAL')
         console.error(error)
         process.exit(-1)
       }
     }
 
-    this.handleUpdate = (target) => {
+    this.handleUpdate = () => {
       return next => async ctx => {
         await this.__saveUser(ctx)
         await this.__saveChat(ctx)
@@ -34,40 +37,40 @@ class mvlBotCMSUsersMiddleware {
 
     this.__saveUser = async ctx => {
       let localUser
-      let senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
+      const senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
       // console.log(ctx.Message);
       if (senderId === -1 || senderId === null) {
-        localUser = this.Model.build({
+        localUser = this.DB.models.mvlBotCMSUser.build({
+        // localUser = this.DB.models.mvlBotCMSUser.build({
           id: -1,
-          fullname: '(anonymous)',
+          fullname: '(anonymous)'
         })
         ctx.singleSession.mvlBotCMSUser = localUser
         return
       }
       let requestUserId = ctx.Message.sender.id === ctx.BC.SELF_SEND ? 0 : ctx.Message.sender.id
       if (requestUserId === 0) {
-        let selfUserInfo = await ctx.Bridge.fetchUserInfo()
+        const selfUserInfo = await ctx.Bridge.fetchUserInfo()
         requestUserId = selfUserInfo.id
       }
       if (requestUserId !== undefined) {
-        localUser = await this.Model.findOne({
+        localUser = await this.DB.models.mvlBotCMSUser.findOne({
           where: {
             userId: requestUserId,
             bridge: ctx.Bridge.name,
-            driver: ctx.Bridge.driverName,
+            driver: ctx.Bridge.driverName
           }
         })
       }
       if (ctx.BC.MT.empty(localUser) || this.__isOld(localUser.updatedAt) || localUser.fullname === null) {
-        let userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx)
+        const userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx)
         // console.log(userInfo);
         if (!ctx.BC.MT.empty(userInfo) && userInfo.id !== undefined) {
-
           localUser = await this.DB.models.mvlBotCMSUser.findOne({
             where: {
               userId: requestUserId,
               bridge: ctx.Bridge.name
-            },
+            }
             // raw: true,
           })
           if (!localUser) {
@@ -81,14 +84,13 @@ class mvlBotCMSUsersMiddleware {
             fullname: userInfo.full_name,
             firstName: userInfo.first_name,
             lastName: userInfo.last_name,
-            type: userInfo.type,
+            type: userInfo.type
           })
           await localUser.save().catch((e) => console.error('ERROR WHILE SAVING BOTCMS USER:', e))
         }
       }
       if (!ctx.BC.MT.empty(localUser)) {
         // console.log('BOTCMS USER MW. SAVE USER. HASH L ', localUser.accessHash, ' T ', ctx.Message.sender.accessHash)
-        let changed = false
         if (ctx.Message.sender.accessHash !== '' && localUser.accessHash !== ctx.Message.sender.accessHash) {
           localUser.accessHash = ctx.Message.sender.accessHash
           localUser.changed('updatedAt', true)
@@ -98,10 +100,10 @@ class mvlBotCMSUsersMiddleware {
         }
         await localUser.save().catch((e) => console.error('ERROR WHILE LOCAL USER SAVE:', e))
       } else {
-        localUser = await this.Model.build({
+        localUser = await this.DB.models.mvlBotCMSUser.build({
           id: -1,
           bridge: ctx.Bridge.name,
-          driver: ctx.Bridge.driverName,
+          driver: ctx.Bridge.driverName
         })
       }
       ctx.singleSession.mvlBotCMSUser = localUser
@@ -109,14 +111,14 @@ class mvlBotCMSUsersMiddleware {
 
     this.__saveChat = async ctx => {
       // console.log('SAVE CHAT. CHAT', ctx.Message.chat)
-      let defaultData = {
+      const defaultData = {
         id: -1,
         chatId: -1,
         bridge: ctx.Bridge.name,
-        driver: ctx.Bridge.driverName,
+        driver: ctx.Bridge.driverName
       }
-      let fetchChatInfo = async (chatId, context) => {
-        let chatInfo = await ctx.Bridge.fetchChatInfo(chatId, context).catch(e => { return { id: null }})
+      const fetchChatInfo = async (chatId, context) => {
+        const chatInfo = await ctx.Bridge.fetchChatInfo(chatId, context).catch(() => { return { id: null } })
         return {
           chatId: chatInfo.id,
           username: ctx.BC.MT.extract('username', chatInfo, null),
@@ -132,19 +134,19 @@ class mvlBotCMSUsersMiddleware {
       let localChat
       let requestChatId = ctx.Message.chat.id
       if (requestChatId === 0) {
-        let selfChatInfo = await ctx.Bridge.fetchChatInfo()
+        const selfChatInfo = await ctx.Bridge.fetchChatInfo()
         requestChatId = selfChatInfo.id
       }
       localChat = await this.DB.models.mvlBotCMSChat.findOne({
         where: {
           chatId: requestChatId,
           bridge: ctx.Bridge.name
-        },
+        }
         // raw: true,
       })
         .catch((e) => console.error('ERROR WHILE FIND mvlBotCMSChat: ', e))
       if (ctx.BC.MT.empty(localChat) || this.__isOld(localChat.updatedAt)) {
-        let chatInfo = await fetchChatInfo(requestChatId, ctx)
+        const chatInfo = await fetchChatInfo(requestChatId, ctx)
         // console.log(chatInfo);
         if (chatInfo.chatId) {
           chatInfo.bridge = ctx.Bridge.name
@@ -154,7 +156,7 @@ class mvlBotCMSUsersMiddleware {
             where: {
               chatId: requestChatId,
               bridge: ctx.Bridge.name
-            },
+            }
             // raw: true,
           })
           if (!localChat) {
@@ -176,17 +178,17 @@ class mvlBotCMSUsersMiddleware {
     }
 
     this.__saveMember = async ctx => {
-      if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser)
-        && ctx.singleSession.mvlBotCMSUser.id !== -1
-        && !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat)
-        && ctx.singleSession.mvlBotCMSChat.id !== -1
+      if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser) &&
+        ctx.singleSession.mvlBotCMSUser.id !== -1 &&
+        !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat) &&
+        ctx.singleSession.mvlBotCMSChat.id !== -1
       ) {
         // console.log(ctx.singleSession.mvlBotCMSUser);
         await this.DB.models.mvlBotCMSChatMember.findOrCreate({
           where: {
             mvlBotCMSUserId: ctx.singleSession.mvlBotCMSUser.id,
-            mvlBotCMSChatId: ctx.singleSession.mvlBotCMSChat.id,
-          },
+            mvlBotCMSChatId: ctx.singleSession.mvlBotCMSChat.id
+          }
         })
           .then(result => {
             ctx.singleSession.mvlBotCMSChatMember = result[0]
@@ -198,8 +200,8 @@ class mvlBotCMSUsersMiddleware {
     }
 
     this.__isOld = (checkDate) => {
-      let oldDate = new Date(checkDate)
-      let now = new Date()
+      const oldDate = new Date(checkDate)
+      const now = new Date()
       return now.getTime() - oldDate.getTime() > this.config.dataTimeout
     }
   }

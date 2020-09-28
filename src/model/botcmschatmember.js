@@ -3,6 +3,6 @@ module.exports = (Sequelize) => {
     joined: Sequelize.DATE,
     permissions: Sequelize.STRING,
     state: Sequelize.STRING,
-    banUntil: Sequelize.DATE,
+    banUntil: Sequelize.DATE
   }
 }

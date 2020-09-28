@@ -10,19 +10,19 @@ mvlBotCMSUsers.exportConfig = {
         BotHandler: {
           botcms: {
             middlewares: [
-              mvlBotCMSUsersMiddleware,
-            ],
-          },
+              mvlBotCMSUsersMiddleware
+            ]
+          }
         },
         DBHandler: {
           models: {
             mvlBotCMSUser: require('./model/botcmsuser'),
             mvlBotCMSChat: require('./model/botcmschat'),
-            mvlBotCMSChatMember: require('./model/botcmschatmember'),
+            mvlBotCMSChatMember: require('./model/botcmschatmember')
           }
         }
       }
-    },
+    }
   }
 }
 

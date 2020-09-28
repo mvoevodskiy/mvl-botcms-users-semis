@@ -1,3 +1,7 @@
+/**
+ * @param {import('mvl-db-handler')} Sequelize
+ * @returns {[{firstName: *, lastName: *, driver: *, accessHash: {defaultValue: string, type: *}, fullname: *, bridge: *, userId: *, userMasterId: *, username: *}, {indexes: [{unique: boolean, fields: [string, string]}, {fields: [string]}, {fields: [string]}]}, {belongsToMany: [{through: {model: string}, as: string, model: string}], belongsTo: [{model: string}], hasMany: [{as: string, model: string}]}]}
+ */
 module.exports = (Sequelize) => {
   return [
     {
@@ -9,10 +13,10 @@ module.exports = (Sequelize) => {
       lastName: Sequelize.STRING,
       accessHash: {
         type: Sequelize.STRING,
-        defaultValue: '',
+        defaultValue: ''
       },
       bridge: Sequelize.STRING(20),
-      driver: Sequelize.STRING,
+      driver: Sequelize.STRING
     },
     {
       indexes: [
@@ -31,8 +35,8 @@ module.exports = (Sequelize) => {
     {
       belongsTo: [
         {
-          model: 'mvlUser',
-        },
+          model: 'mvlUser'
+        }
       ],
       belongsToMany: [
         {
@@ -46,7 +50,7 @@ module.exports = (Sequelize) => {
       hasMany: [
         {
           model: 'mvlBotCMSChatMember',
-          as: 'ChatMembers',
+          as: 'ChatMembers'
         }
       ]
     }

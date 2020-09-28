@@ -11,14 +11,14 @@ module.exports = (Sequelize) => {
       inviteLink: Sequelize.STRING,
       type: {
         type: Sequelize.STRING,
-        defaultValue: '',
+        defaultValue: ''
       },
       accessHash: {
         type: Sequelize.STRING,
-        defaultValue: '',
+        defaultValue: ''
       },
       bridge: Sequelize.STRING(20),
-      driver: Sequelize.STRING,
+      driver: Sequelize.STRING
     },
     {
       indexes: [

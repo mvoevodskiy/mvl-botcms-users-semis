@@ -10,6 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "mvl-db-handler": "^1.0.5",
     "mvloader": "^1.0.6"
+  },
+  "devDependencies": {
+    "botcms": "^1.0.29",
+    "sequelize": "^5.21.5"
   }
 }

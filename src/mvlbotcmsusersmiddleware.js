@@ -1,16 +1,23 @@
 /**
  * @class Middleware for BotCMS to control users
- * @param {import('mvl-db-handler').Sequelize} DB
+ * @property {import('botcms')} BotCMS
+ * @property {import('mvl-db-handler').Sequelize} DB
+ * @property {Object<string,*>}
  */
 class mvlBotCMSUsersMiddleware {
   constructor (BotCMS) {
     this.BotCMS = BotCMS
-    /** @param {import('mvl-db-handler').Sequelize} */
     this.DB = null
     this.config = {
       dataTimeout: 5 * 60 * 1000
     }
 
+    /**
+     * @function
+     * @param {import('botcms')}target
+     * @property {callback} next}
+     * @returns {function(*): function(): *}
+     */
     this.successDB = (target) => {
       return next => () => {
         this.DB = target.DB
@@ -18,6 +25,11 @@ class mvlBotCMSUsersMiddleware {
       }
     }
 
+    /**
+     * @function
+     * @property {Error} error}
+     * @returns {function(*): function(): *}
+     */
     this.failDB = () => {
       return () => error => {
         console.error('BOTCMS USERS. DB FAIL. FATAL')
@@ -26,6 +38,12 @@ class mvlBotCMSUsersMiddleware {
       }
     }
 
+    /**
+     * @function
+     * @property {callback} next}
+     * @property {import('botcms').Context} ctx
+     * @returns {function(*): function(*=): Promise<*>}
+     */
     this.handleUpdate = () => {
       return next => async ctx => {
         await this.__saveUser(ctx)
@@ -35,13 +53,20 @@ class mvlBotCMSUsersMiddleware {
       }
     }
 
+    /**
+     * Save BotCMS User to DB
+     * @function
+     * @property {import('botcms').Context} ctx
+     * @returns {Promise<void>}
+     * @private
+     */
     this.__saveUser = async ctx => {
+      /* @param {import('mvl-db-handler').Model} localUser */
       let localUser
       const senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
       // console.log(ctx.Message);
       if (senderId === -1 || senderId === null) {
         localUser = this.DB.models.mvlBotCMSUser.build({
-        // localUser = this.DB.models.mvlBotCMSUser.build({
           id: -1,
           fullname: '(anonymous)'
         })
@@ -109,6 +134,13 @@ class mvlBotCMSUsersMiddleware {
       ctx.singleSession.mvlBotCMSUser = localUser
     }
 
+    /**
+     * Save BotCMS Chat to DB
+     * @function
+     * @property {import('botcms').Context} ctx
+     * @returns {Promise<void>}
+     * @private
+     */
     this.__saveChat = async ctx => {
       // console.log('SAVE CHAT. CHAT', ctx.Message.chat)
       const defaultData = {
@@ -133,7 +165,7 @@ class mvlBotCMSUsersMiddleware {
       }
       let localChat
       let requestChatId = ctx.Message.chat.id
-      if (requestChatId === 0) {
+      if (requestChatId === 0 || requestChatId === '0') {
         const selfChatInfo = await ctx.Bridge.fetchChatInfo()
         requestChatId = selfChatInfo.id
       }
@@ -177,6 +209,13 @@ class mvlBotCMSUsersMiddleware {
       ctx.singleSession.mvlBotCMSChat = localChat
     }
 
+    /**
+     * Save BotCMS Chat Member to DB
+     * @function
+     * @property {import('botcms').Context} ctx
+     * @returns {Promise<void>}
+     * @private
+     */
     this.__saveMember = async ctx => {
       if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser) &&
         ctx.singleSession.mvlBotCMSUser.id !== -1 &&
@@ -199,6 +238,13 @@ class mvlBotCMSUsersMiddleware {
       }
     }
 
+    /**
+     * Check if date is too old
+     * @function
+     * @param checkDate
+     * @returns {boolean}
+     * @private
+     */
     this.__isOld = (checkDate) => {
       const oldDate = new Date(checkDate)
       const now = new Date()

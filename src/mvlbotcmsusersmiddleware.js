@@ -46,9 +46,10 @@ class mvlBotCMSUsersMiddleware {
      */
     this.handleUpdate = () => {
       return next => async ctx => {
+        const state = ctx.Message.event === 'chatMemberLeft' ? 'left' : 'member'
         await this.__saveUser(ctx)
         await this.__saveChat(ctx)
-        await this.__saveMember(ctx)
+        await this.__saveMember(ctx, state)
         return next(ctx)
       }
     }
@@ -216,7 +217,7 @@ class mvlBotCMSUsersMiddleware {
      * @returns {Promise<void>}
      * @private
      */
-    this.__saveMember = async ctx => {
+    this.__saveMember = async (ctx, state) => {
       if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser) &&
         ctx.singleSession.mvlBotCMSUser.id !== -1 &&
         !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat) &&
@@ -229,8 +230,12 @@ class mvlBotCMSUsersMiddleware {
             mvlBotCMSChatId: ctx.singleSession.mvlBotCMSChat.id
           }
         })
-          .then(result => {
+          .then(async result => {
             ctx.singleSession.mvlBotCMSChatMember = result[0]
+            if (ctx.singleSession.mvlBotCMSChatMember.state !== state) {
+              ctx.singleSession.mvlBotCMSChatMember.set('state', state)
+              await ctx.singleSession.mvlBotCMSChatMember.save()
+            }
           })
           .catch(e => {
             console.error(e, ctx.singleSession.mvlBotCMSUser.id, ctx.singleSession.mvlBotCMSUser)

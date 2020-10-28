@@ -21,7 +21,7 @@ module.exports = (Sequelize) => {
     {
       indexes: [
         {
-          fields: ['userId', 'bridge'],
+          fields: ['bridge', 'userId'],
           unique: true
         },
         {

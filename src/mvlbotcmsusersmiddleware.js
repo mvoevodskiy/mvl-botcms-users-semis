@@ -83,8 +83,8 @@ class mvlBotCMSUsersMiddleware {
         localUser = await this.DB.models.mvlBotCMSUser.findOne({
           where: {
             userId: requestUserId,
-            bridge: ctx.Bridge.name,
-            driver: ctx.Bridge.driverName
+            bridge: ctx.Bridge.name
+            // driver: ctx.Bridge.driverName
           }
         })
       }

@@ -9,7 +9,8 @@ class mvlBotCMSUsersMiddleware {
     this.BotCMS = BotCMS
     this.DB = null
     this.config = {
-      dataTimeout: 5 * 60 * 1000
+      dataTimeout: 5 * 60 * 1000,
+      state: 'member'
     }
 
     /**
@@ -46,10 +47,30 @@ class mvlBotCMSUsersMiddleware {
      */
     this.handleUpdate = () => {
       return next => async ctx => {
-        const state = ctx.Message.event === 'chatMemberLeft' ? 'left' : 'member'
-        await this.__saveUser(ctx)
-        await this.__saveChat(ctx)
-        await this.__saveMember(ctx, state)
+        console.log('USERS', ctx.Message.users)
+        const users = []
+        let state
+        const senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
+        const selfAction = ctx.Message.users.length && ctx.Message.users[0].id === senderId
+        const chat = await this.__saveChat(ctx)
+        const senderMember = await this.__saveUser(ctx, senderId)
+        if (ctx.Message.event === 'chatMemberNew' && selfAction) state = 'member'
+        if (ctx.Message.event === 'chatMemberLeft' && selfAction) state = 'left'
+        ctx.singleSession.mvlBotCMSChat = chat
+        ctx.singleSession.mvlBotCMSUser = senderMember.user
+        ctx.singleSession.mvlBotCMSUsers = [senderMember.user]
+        ctx.singleSession.mvlBotCMSChatMember = await this.__saveMember(ctx, chat, senderMember.user, senderMember.memberState || state)
+        if (ctx.Message.event === 'chatMemberNew') state = 'member'
+        if (ctx.Message.event === 'chatMemberLeft') state = 'left'
+        for (const botUser of ctx.Message.users) {
+          if (botUser.id === senderMember.id) continue
+          users.push((async () => {
+            const chatUser = await this.__saveUser(ctx, botUser.id)
+            await this.__saveMember(ctx, chat, chatUser.user, chatUser.memberState || state)
+            ctx.singleSession.mvlBotCMSUsers.push(chatUser.user)
+          })())
+        }
+        await Promise.all(users)
         return next(ctx)
       }
     }
@@ -61,20 +82,20 @@ class mvlBotCMSUsersMiddleware {
      * @returns {Promise<void>}
      * @private
      */
-    this.__saveUser = async ctx => {
+    this.__saveUser = async (ctx, userId = -1) => {
       /* @param {import('mvl-db-handler').Model} localUser */
       let localUser
-      const senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
+      let memberState
+      // const userId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
       // console.log(ctx.Message);
-      if (senderId === -1 || senderId === null) {
+      if (userId === -1 || userId === null) {
         localUser = this.DB.models.mvlBotCMSUser.build({
           id: -1,
           fullname: '(anonymous)'
         })
-        ctx.singleSession.mvlBotCMSUser = localUser
-        return
+        return localUser
       }
-      let requestUserId = ctx.Message.sender.id === ctx.BC.SELF_SEND ? 0 : ctx.Message.sender.id
+      let requestUserId = userId === ctx.BC.SELF_SEND ? 0 : userId
       if (requestUserId === 0) {
         const selfUserInfo = await ctx.Bridge.fetchUserInfo()
         requestUserId = selfUserInfo.id
@@ -90,7 +111,7 @@ class mvlBotCMSUsersMiddleware {
       }
       if (ctx.BC.MT.empty(localUser) || this.__isOld(localUser.updatedAt) || localUser.fullname === null) {
         const userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx)
-        // console.log(userInfo);
+        console.log(userInfo)
         if (!ctx.BC.MT.empty(userInfo) && userInfo.id !== undefined) {
           localUser = await this.DB.models.mvlBotCMSUser.findOne({
             where: {
@@ -113,14 +134,10 @@ class mvlBotCMSUsersMiddleware {
             type: userInfo.type
           })
           await localUser.save().catch((e) => console.error('ERROR WHILE SAVING BOTCMS USER:', e))
+          memberState = userInfo.memberState
         }
       }
       if (!ctx.BC.MT.empty(localUser)) {
-        // console.log('BOTCMS USER MW. SAVE USER. HASH L ', localUser.accessHash, ' T ', ctx.Message.sender.accessHash)
-        if (ctx.Message.sender.accessHash !== '' && localUser.accessHash !== ctx.Message.sender.accessHash) {
-          localUser.accessHash = ctx.Message.sender.accessHash
-          localUser.changed('updatedAt', true)
-        }
         if (this.__isOld(localUser.updatedAt)) {
           localUser.changed('updatedAt', true)
         }
@@ -132,7 +149,7 @@ class mvlBotCMSUsersMiddleware {
           driver: ctx.Bridge.driverName
         })
       }
-      ctx.singleSession.mvlBotCMSUser = localUser
+      return { user: localUser, memberState }
     }
 
     /**
@@ -207,7 +224,7 @@ class mvlBotCMSUsersMiddleware {
       } else {
         localChat = await this.DB.models.mvlBotCMSChat.build(defaultData)
       }
-      ctx.singleSession.mvlBotCMSChat = localChat
+      return localChat
     }
 
     /**
@@ -217,29 +234,23 @@ class mvlBotCMSUsersMiddleware {
      * @returns {Promise<void>}
      * @private
      */
-    this.__saveMember = async (ctx, state) => {
-      if (!this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSUser) &&
-        ctx.singleSession.mvlBotCMSUser.id !== -1 &&
-        !this.BotCMS.MT.empty(ctx.singleSession.mvlBotCMSChat) &&
-        ctx.singleSession.mvlBotCMSChat.id !== -1
-      ) {
+    this.__saveMember = async (ctx, chat, user, state) => {
+      if (!this.BotCMS.MT.empty(user) && user.id !== -1 && !this.BotCMS.MT.empty(chat) && chat.id !== -1) {
         // console.log(ctx.singleSession.mvlBotCMSUser);
-        await this.DB.models.mvlBotCMSChatMember.findOrCreate({
+        const result = await this.DB.models.mvlBotCMSChatMember.findOrCreate({
           where: {
-            mvlBotCMSUserId: ctx.singleSession.mvlBotCMSUser.id,
-            mvlBotCMSChatId: ctx.singleSession.mvlBotCMSChat.id
+            mvlBotCMSUserId: user.id,
+            mvlBotCMSChatId: chat.id
           }
+        }).catch(e => {
+          console.error('ERROR WHILE UPDATE CHAT MEMBER', e, user.get())
         })
-          .then(async result => {
-            ctx.singleSession.mvlBotCMSChatMember = result[0]
-            if (ctx.singleSession.mvlBotCMSChatMember.state !== state) {
-              ctx.singleSession.mvlBotCMSChatMember.set('state', state)
-              await ctx.singleSession.mvlBotCMSChatMember.save()
-            }
-          })
-          .catch(e => {
-            console.error(e, ctx.singleSession.mvlBotCMSUser.id, ctx.singleSession.mvlBotCMSUser)
-          })
+        const member = result[0]
+        if (member !== null && state !== undefined && member.state !== state) {
+          member.set('state', state)
+          await member.save({ logging: console.log })
+        }
+        return member
       }
     }
 

@@ -43,6 +43,12 @@ module.exports = (Sequelize) => {
             model: 'mvlBotCMSChatMember'
           }
         }
+      ],
+      hasMany: [
+        {
+          model: 'mvlBotCMSChatMember',
+          as: 'ChatMembers'
+        }
       ]
     }
   ]

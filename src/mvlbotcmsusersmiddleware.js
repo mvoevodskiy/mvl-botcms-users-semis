@@ -1,7 +1,7 @@
 /**
  * @class Middleware for BotCMS to control users
- * @property {import('botcms')} BotCMS
- * @property {import('mvl-db-handler').Sequelize} DB
+ * @property {Object<import('botcms')>} BotCMS
+ * @property {Object<import('mvl-db-handler').Sequelize>} DB
  * @property {Object<string,*>}
  */
 class mvlBotCMSUsersMiddleware {
@@ -15,7 +15,7 @@ class mvlBotCMSUsersMiddleware {
 
     /**
      * @function
-     * @param {import('botcms')}target
+     * @param {Object<import('botcms')>}target
      * @property {callback} next}
      * @returns {function(*): function(): *}
      */
@@ -42,12 +42,12 @@ class mvlBotCMSUsersMiddleware {
     /**
      * @function
      * @property {callback} next}
-     * @property {import('botcms').Context} ctx
+     * @property {Object<import('botcms').Context>} ctx
      * @returns {function(*): function(*=): Promise<*>}
      */
     this.handleUpdate = () => {
       return next => async ctx => {
-        console.log('USERS', ctx.Message.users)
+        // console.log('USERS', ctx.Message.users)
         const users = []
         let state
         const senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
@@ -155,7 +155,7 @@ class mvlBotCMSUsersMiddleware {
     /**
      * Save BotCMS Chat to DB
      * @function
-     * @property {import('botcms').Context} ctx
+     * @property {Object<import('botcms').Context>} ctx
      * @returns {Promise<void>}
      * @private
      */
@@ -168,6 +168,7 @@ class mvlBotCMSUsersMiddleware {
         driver: ctx.Bridge.driverName
       }
       const fetchChatInfo = async (chatId, context) => {
+        // console.log('SAVE CHAT. CHAT ID', chatId)
         const chatInfo = await ctx.Bridge.fetchChatInfo(chatId, context).catch(() => { return { id: null } })
         return {
           chatId: chatInfo.id,
@@ -181,22 +182,30 @@ class mvlBotCMSUsersMiddleware {
           inviteLink: ctx.BC.MT.extract('invite_link', chatInfo, null)
         }
       }
+      const chatProps = {
+        changeId: ctx.Message.event === ctx.Message.EVENTS.CHAT_CHANGED_ID,
+        exists: ctx.Message.event !== ctx.Message.EVENTS.CHAT_NOT_FOUND,
+        id: this.BotCMS.MT.extract('changeId.old', ctx.Message, ctx.Message.chat.id),
+        oldId: this.BotCMS.MT.extract('changeId.old', ctx.Message, ctx.Message.chat.id),
+        newId: this.BotCMS.MT.extract('changeId.new', ctx.Message, ctx.Message.chat.id)
+      }
+      // console.log('SAVE CHAT. CHAT PROPS', chatProps)
       let localChat
-      let requestChatId = ctx.Message.chat.id
+      let requestChatId = chatProps.id
       if (requestChatId === 0 || requestChatId === '0') {
         const selfChatInfo = await ctx.Bridge.fetchChatInfo()
         requestChatId = selfChatInfo.id
       }
       localChat = await this.DB.models.mvlBotCMSChat.findOne({
         where: {
-          chatId: requestChatId,
+          chatId: chatProps.changeId ? [chatProps.oldId, chatProps.newId] : chatProps.id,
           bridge: ctx.Bridge.name
         }
         // raw: true,
       })
         .catch((e) => console.error('ERROR WHILE FIND mvlBotCMSChat: ', e))
       if (ctx.BC.MT.empty(localChat) || this.__isOld(localChat.updatedAt)) {
-        const chatInfo = await fetchChatInfo(requestChatId, ctx)
+        const chatInfo = await fetchChatInfo(chatProps.changeId ? requestChatId : chatProps.newId, ctx)
         // console.log(chatInfo);
         if (chatInfo.chatId) {
           chatInfo.bridge = ctx.Bridge.name
@@ -214,9 +223,17 @@ class mvlBotCMSUsersMiddleware {
           }
           await localChat.set(chatInfo)
           await localChat.save()
+          // console.log('SAVE CHAT. LOCAL CHAT', localChat.get())
         }
       }
       if (!ctx.BC.MT.empty(localChat)) {
+        if (String(localChat.chatId) !== String(chatProps.newId)) {
+          // console.log('SAVE CHAT. CHAT ID NOT MATCH')
+          localChat.set('chatId', chatProps.newId)
+          await localChat.save().catch((e) => console.error('ERROR WHILE SAVE mvlBotCMSChat: ', e))
+        } else {
+          // console.log('SAVE CHAT. CHAT ID IS EQUAL')
+        }
         if (this.__isOld(localChat.updatedAt)) {
           localChat.changed('updatedAt', true)
           await localChat.save().catch((e) => console.error('ERROR WHILE SAVE mvlBotCMSChat: ', e))

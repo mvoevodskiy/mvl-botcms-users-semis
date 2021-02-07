@@ -8,6 +8,11 @@ class mvlBotCMSUsersMiddleware {
   constructor (BotCMS) {
     this.BotCMS = BotCMS
     this.DB = null
+    this.STATES = {
+      NOT_FOUND: 'notFound',
+      BLOCKED: 'blocked',
+      BOT_KICKED: 'botKicked'
+    }
     this.config = {
       dataTimeout: 5 * 60 * 1000,
       state: 'member'
@@ -141,6 +146,7 @@ class mvlBotCMSUsersMiddleware {
         if (this.__isOld(localUser.updatedAt)) {
           localUser.changed('updatedAt', true)
         }
+        localUser.set('state', this.__getChatUserState(ctx))
         await localUser.save().catch((e) => console.error('ERROR WHILE LOCAL USER SAVE:', e))
       } else {
         localUser = await this.DB.models.mvlBotCMSUser.build({
@@ -230,14 +236,12 @@ class mvlBotCMSUsersMiddleware {
         if (String(localChat.chatId) !== String(chatProps.newId)) {
           // console.log('SAVE CHAT. CHAT ID NOT MATCH')
           localChat.set('chatId', chatProps.newId)
-          await localChat.save().catch((e) => console.error('ERROR WHILE SAVE mvlBotCMSChat: ', e))
-        } else {
-          // console.log('SAVE CHAT. CHAT ID IS EQUAL')
         }
+        localChat.set('state', this.__getChatUserState(ctx))
         if (this.__isOld(localChat.updatedAt)) {
           localChat.changed('updatedAt', true)
-          await localChat.save().catch((e) => console.error('ERROR WHILE SAVE mvlBotCMSChat: ', e))
         }
+        await localChat.save().catch((e) => console.error('ERROR WHILE SAVE mvlBotCMSChat: ', e))
       } else {
         localChat = await this.DB.models.mvlBotCMSChat.build(defaultData)
       }
@@ -282,6 +286,20 @@ class mvlBotCMSUsersMiddleware {
       const oldDate = new Date(checkDate)
       const now = new Date()
       return now.getTime() - oldDate.getTime() > this.config.dataTimeout
+    }
+
+    this.__getChatUserState = (ctx) => {
+      let state = 'active'
+      if ([ctx.Message.EVENTS.CHAT_NOT_FOUND, ctx.Message.EVENTS.USER_NOT_FOUND].indexOf(ctx.Message.event) !== -1) {
+        state = this.STATES.NOT_FOUND
+      }
+      if ([ctx.Message.EVENTS.BOT_KICKED_FROM_CHAT, ctx.Message.EVENTS.BOT_BLOCKED_BY_USER].indexOf(ctx.Message.event) !== -1) {
+        state = this.STATES.BOT_KICKED
+      }
+      if (ctx.Message.event === ctx.Message.EVENTS.USER_BLOCKED) {
+        state = this.STATES.BLOCKED
+      }
+      return state
     }
   }
 }

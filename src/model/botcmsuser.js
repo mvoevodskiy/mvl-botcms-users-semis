@@ -16,7 +16,11 @@ module.exports = (Sequelize) => {
         defaultValue: ''
       },
       bridge: Sequelize.STRING(20),
-      driver: Sequelize.STRING
+      driver: Sequelize.STRING,
+      state: {
+        type: Sequelize.STRING(20),
+        defaultValue: 'active'
+      }
     },
     {
       indexes: [
@@ -25,10 +29,16 @@ module.exports = (Sequelize) => {
           unique: true
         },
         {
+          fields: ['userId']
+        },
+        {
           fields: ['username']
         },
         {
           fields: ['driver']
+        },
+        {
+          fields: ['state']
         }
       ]
     },

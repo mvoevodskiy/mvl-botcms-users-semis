@@ -15,7 +15,8 @@ class mvlBotCMSUsersMiddleware {
     }
     this.config = {
       dataTimeout: 5 * 60 * 1000,
-      state: 'member'
+      state: 'member',
+      userMethods: ['send']
     }
 
     /**
@@ -77,6 +78,19 @@ class mvlBotCMSUsersMiddleware {
         }
         await Promise.all(users)
         return next(ctx)
+      }
+    }
+
+    this.bridgeExec = (target) => {
+      return next => async (execParams, logParams = {}) => {
+        console.log('BOT USERS MW. BRIDGE EXEC.')
+        if (this.config.userMethods.indexOf(execParams.method) !== -1) {
+          if (await target.DB.models.mvlBotCMSUser.count({ where: { userId: execParams.params.peerId, state: 'active' } })) {
+            return next(execParams, logParams)
+          }
+          console.error('BOTCMS USERS MW. BOT USER', execParams.params.peerId, 'IS NOT ACTIVE. BREAK SENDING. MESSAGE:\n', execParams.params.message)
+        }
+        return await next(execParams, logParams)
       }
     }
 

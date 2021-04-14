@@ -88,7 +88,7 @@ class mvlBotCMSUsersMiddleware {
       return next => async (execParams, logParams = {}) => {
         console.log('BOT USERS MW. BRIDGE EXEC.')
         if (this.config.userMethods.indexOf(execParams.method) !== -1) {
-          if (await target.DB.models.mvlBotCMSChat.count({ where: { chatId: execParams.params.peerId, state: 'active' } })) {
+          if (await target.DB.models.mvlBotCMSChat.count({ where: { chatId: String(execParams.params.peerId), state: 'active' } })) {
             return next(execParams, logParams)
           }
           console.error('BOTCMS USERS MW. BOT CHAT', execParams.params.peerId, 'IS NOT ACTIVE. BREAK SENDING. MESSAGE:\n', execParams.params.message)
@@ -125,7 +125,7 @@ class mvlBotCMSUsersMiddleware {
       if (requestUserId !== undefined) {
         localUser = await this.DB.models.mvlBotCMSUser.findOne({
           where: {
-            userId: requestUserId,
+            userId: String(requestUserId),
             bridge: ctx.Bridge.name
             // driver: ctx.Bridge.driverName
           }
@@ -146,7 +146,7 @@ class mvlBotCMSUsersMiddleware {
         if (!ctx.BC.MT.empty(userInfo) && userInfo.id !== undefined) {
           localUser = await this.DB.models.mvlBotCMSUser.findOne({
             where: {
-              userId: requestUserId,
+              userId: String(requestUserId),
               bridge: ctx.Bridge.name
             }
             // raw: true,
@@ -155,7 +155,7 @@ class mvlBotCMSUsersMiddleware {
             localUser = await this.DB.models.mvlBotCMSUser.build()
           }
           await localUser.set({
-            userId: userInfo.id,
+            userId: String(userInfo.id),
             bridge: ctx.Bridge.name,
             driver: ctx.Bridge.driverName,
             username: userInfo.username,
@@ -235,7 +235,7 @@ class mvlBotCMSUsersMiddleware {
       }
       localChat = await this.DB.models.mvlBotCMSChat.findOne({
         where: {
-          chatId: chatProps.changeId ? [chatProps.oldId, chatProps.newId] : chatProps.id,
+          chatId: chatProps.changeId ? [String(chatProps.oldId), String(chatProps.newId)] : String(chatProps.id),
           bridge: ctx.Bridge.name
         }
         // raw: true,
@@ -255,12 +255,13 @@ class mvlBotCMSUsersMiddleware {
         chatInfo = await fetchChatInfo(chatProps.changeId ? requestChatId : chatProps.newId, ctx)
         // console.log(chatInfo)
         if (chatInfo.chatId) {
+          chatInfo.chatId = String(chatInfo.chatId)
           chatInfo.bridge = ctx.Bridge.name
           chatInfo.driver = ctx.Bridge.driverName
 
           localChat = await this.DB.models.mvlBotCMSChat.findOne({
             where: {
-              chatId: requestChatId,
+              chatId: String(requestChatId),
               bridge: ctx.Bridge.name
             }
             // raw: true,
@@ -276,7 +277,7 @@ class mvlBotCMSUsersMiddleware {
       if (!ctx.BC.MT.empty(localChat)) {
         if (String(localChat.chatId) !== String(chatProps.newId)) {
           // console.log('SAVE CHAT. CHAT ID NOT MATCH')
-          localChat.set('chatId', chatProps.newId)
+          localChat.set('chatId', String(chatProps.newId))
         }
         localChat.set('state', this.__getChatUserState(ctx, chatInfo))
         if (this.__isOld(localChat.updatedAt)) {

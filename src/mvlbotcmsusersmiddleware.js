@@ -59,8 +59,8 @@ class mvlBotCMSUsersMiddleware {
         let state
         const senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
         const selfAction = ctx.Message.users.length && ctx.Message.users[0].id === senderId
-        const chat = await this.__saveChat(ctx)
-        const senderMember = await this.__saveUser(ctx, senderId)
+        const chat = await this.__saveChat(ctx).catch(e => console.error('SAVE BOTCMS CHAT FAILURE:', e))
+        const senderMember = await this.__saveUser(ctx, senderId).catch(e => console.error('SAVE BOTCMS USER FAILURE:', e))
         if (ctx.Message.event === 'chatMemberNew' && selfAction) state = 'member'
         if (ctx.Message.event === 'chatMemberLeft' && selfAction) state = 'left'
         if (BC.MT.extract('mvlBotCMSChat.id', ctx.singleSession, -1) === -1) ctx.state.mvlBotCMSChat = chat
@@ -307,6 +307,7 @@ class mvlBotCMSUsersMiddleware {
           }
         }).catch(e => {
           console.error('ERROR WHILE UPDATE CHAT MEMBER', e, user.get())
+          return [null]
         })
         const member = result[0]
         if (member !== null && state !== undefined && member.state !== state) {

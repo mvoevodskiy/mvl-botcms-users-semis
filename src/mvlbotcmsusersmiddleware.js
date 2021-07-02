@@ -1,3 +1,5 @@
+const mt = require('mvtools')
+
 /**
  * @class Middleware for BotCMS to control users
  * @property {Object<import('botcms')>} BotCMS
@@ -57,14 +59,14 @@ class mvlBotCMSUsersMiddleware {
         // console.log('USERS', ctx.Message.users)
         const users = []
         let state
-        const senderId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
+        const senderId = mt.extract('Message.sender.id', ctx, -1)
         const selfAction = ctx.Message.users.length && ctx.Message.users[0].id === senderId
         const chat = await this.__saveChat(ctx).catch(e => console.error('SAVE BOTCMS CHAT FAILURE:', e))
         const senderMember = await this.__saveUser(ctx, senderId).catch(e => console.error('SAVE BOTCMS USER FAILURE:', e))
         if (ctx.Message.event === 'chatMemberNew' && selfAction) state = 'member'
         if (ctx.Message.event === 'chatMemberLeft' && selfAction) state = 'left'
-        if (BC.MT.extract('mvlBotCMSChat.id', ctx.singleSession, -1) === -1) ctx.state.mvlBotCMSChat = chat
-        if (BC.MT.extract('mvlBotCMSUser.id', ctx.singleSession, -1) === -1) {
+        if (mt.extract('mvlBotCMSChat.id', ctx.singleSession, -1) === -1) ctx.state.mvlBotCMSChat = chat
+        if (mt.extract('mvlBotCMSUser.id', ctx.singleSession, -1) === -1) {
           ctx.singleSession.mvlBotCMSUser = senderMember.user
           ctx.singleSession.mvlBotCMSUsers = [senderMember.user]
           ctx.singleSession.mvlBotCMSChatMember = await this.__saveMember(ctx, chat, senderMember.user, senderMember.memberState || state)
@@ -108,7 +110,7 @@ class mvlBotCMSUsersMiddleware {
       /* @param {import('mvl-db-handler').Model} localUser */
       let localUser
       let memberState
-      // const userId = ctx.BC.MT.extract('Message.sender.id', ctx, -1)
+      // const userId = mt.extract('Message.sender.id', ctx, -1)
       // console.log(ctx.Message);
       if (userId === -1 || userId === null) {
         localUser = this.DB.models.mvlBotCMSUser.build({
@@ -131,7 +133,7 @@ class mvlBotCMSUsersMiddleware {
           }
         })
       }
-      if (!ctx.BC.MT.empty(localUser)) {
+      if (!mt.empty(localUser)) {
         if (ctx.Message.event === ctx.Message.EVENTS.USER_NOT_FOUND ||
           (ctx.Message.event === ctx.Message.EVENTS.CHAT_NOT_FOUND && String(localUser.userId === String(ctx.Message.chat.id)))
         ) {
@@ -140,10 +142,10 @@ class mvlBotCMSUsersMiddleware {
           return { user: localUser, memberState: 'notFound' }
         }
       }
-      if (ctx.BC.MT.empty(localUser) || this.__isOld(localUser.updatedAt) || localUser.fullname === null) {
+      if (mt.empty(localUser) || this.__isOld(localUser.updatedAt) || localUser.fullname === null) {
         const userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx)
         console.log(userInfo)
-        if (!ctx.BC.MT.empty(userInfo) && userInfo.id !== undefined) {
+        if (!mt.empty(userInfo) && userInfo.id !== undefined) {
           localUser = await this.DB.models.mvlBotCMSUser.findOne({
             where: {
               userId: String(requestUserId),
@@ -168,7 +170,7 @@ class mvlBotCMSUsersMiddleware {
           memberState = userInfo.memberState
         }
       }
-      if (!ctx.BC.MT.empty(localUser)) {
+      if (!mt.empty(localUser)) {
         if (this.__isOld(localUser.updatedAt)) {
           localUser.changed('updatedAt', true)
         }
@@ -207,23 +209,23 @@ class mvlBotCMSUsersMiddleware {
         })
         return {
           chatId: chatInfo.id,
-          username: ctx.BC.MT.extract('username', chatInfo, null),
-          title: ctx.BC.MT.extract('title', chatInfo, null),
-          fullname: ctx.BC.MT.extract('full_name', chatInfo, null),
-          firstName: ctx.BC.MT.extract('first_name', chatInfo, null),
-          lastName: ctx.BC.MT.extract('last_name', chatInfo, null),
-          type: ctx.BC.MT.extract('type', chatInfo, null),
-          description: ctx.BC.MT.extract('description', chatInfo, null),
-          inviteLink: ctx.BC.MT.extract('invite_link', chatInfo, null),
-          state: ctx.BC.MT.extract('state', chatInfo, 'active')
+          username: mt.extract('username', chatInfo, null),
+          title: mt.extract('title', chatInfo, null),
+          fullname: mt.extract('full_name', chatInfo, null),
+          firstName: mt.extract('first_name', chatInfo, null),
+          lastName: mt.extract('last_name', chatInfo, null),
+          type: mt.extract('type', chatInfo, null),
+          description: mt.extract('description', chatInfo, null),
+          inviteLink: mt.extract('invite_link', chatInfo, null),
+          state: mt.extract('state', chatInfo, 'active')
         }
       }
       const chatProps = {
         changeId: ctx.Message.event === ctx.Message.EVENTS.CHAT_CHANGED_ID,
         exists: ctx.Message.event !== ctx.Message.EVENTS.CHAT_NOT_FOUND,
-        id: this.BotCMS.MT.extract('changeId.old', ctx.Message, ctx.Message.chat.id),
-        oldId: this.BotCMS.MT.extract('changeId.old', ctx.Message, ctx.Message.chat.id),
-        newId: this.BotCMS.MT.extract('changeId.new', ctx.Message, ctx.Message.chat.id)
+        id: mt.extract('changeId.old', ctx.Message, ctx.Message.chat.id),
+        oldId: mt.extract('changeId.old', ctx.Message, ctx.Message.chat.id),
+        newId: mt.extract('changeId.new', ctx.Message, ctx.Message.chat.id)
       }
       // console.log('DELETED CHAT -575096725: ', await fetchChatInfo('-575096725', ctx))
       // console.log('SAVE CHAT. CHAT PROPS', chatProps)
@@ -241,7 +243,7 @@ class mvlBotCMSUsersMiddleware {
         // raw: true,
       })
         .catch((e) => console.error('ERROR WHILE FIND mvlBotCMSChat: ', e))
-      if (!ctx.BC.MT.empty(localChat)) {
+      if (!mt.empty(localChat)) {
         if (ctx.Message.event === ctx.Message.EVENTS.CHAT_NOT_FOUND ||
           (ctx.Message.event === ctx.Message.EVENTS.USER_NOT_FOUND && String(localChat.userId === String(ctx.Message.sender.id)))
         ) {
@@ -251,7 +253,7 @@ class mvlBotCMSUsersMiddleware {
         }
       }
       let chatInfo = {}
-      if (ctx.BC.MT.empty(localChat) || this.__isOld(localChat.updatedAt) || ctx.Message.event === ctx.Message.EVENTS.CHAT_MEMBER_LEFT) {
+      if (mt.empty(localChat) || this.__isOld(localChat.updatedAt) || ctx.Message.event === ctx.Message.EVENTS.CHAT_MEMBER_LEFT) {
         chatInfo = await fetchChatInfo(chatProps.changeId ? requestChatId : chatProps.newId, ctx)
         // console.log(chatInfo)
         if (chatInfo.chatId) {
@@ -274,7 +276,7 @@ class mvlBotCMSUsersMiddleware {
           // console.log('SAVE CHAT. LOCAL CHAT', localChat.get())
         }
       }
-      if (!ctx.BC.MT.empty(localChat)) {
+      if (!mt.empty(localChat)) {
         if (String(localChat.chatId) !== String(chatProps.newId)) {
           // console.log('SAVE CHAT. CHAT ID NOT MATCH')
           localChat.set('chatId', String(chatProps.newId))
@@ -298,7 +300,7 @@ class mvlBotCMSUsersMiddleware {
      * @private
      */
     this.__saveMember = async (ctx, chat, user, state) => {
-      if (!this.BotCMS.MT.empty(user) && user.id !== -1 && !this.BotCMS.MT.empty(chat) && chat.id !== -1) {
+      if (!mt.empty(user) && user.id !== -1 && !mt.empty(chat) && chat.id !== -1) {
         // console.log(ctx.singleSession.mvlBotCMSUser);
         const result = await this.DB.models.mvlBotCMSChatMember.findOrCreate({
           where: {

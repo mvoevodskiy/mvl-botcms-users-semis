@@ -16,11 +16,17 @@ class mvlBotCMSUsersMiddleware {
       BOT_KICKED: 'botKicked',
       MIGRATED: 'migrated'
     }
-    this.config = {
+    const defaults = {
       dataTimeout: 5 * 60 * 1000,
       state: 'member',
-      userMethods: ['send']
+      userMethods: ['send'],
+      exclude: {
+        drivers: [],
+        bridges: []
+      }
     }
+
+    this.config = mt.mergeRecursive(defaults, mt.extract('mvlBotCMSUsersMiddleware', BotCMS.config, {}))
 
     /**
      * @function
@@ -57,29 +63,50 @@ class mvlBotCMSUsersMiddleware {
     this.handleUpdate = (BC) => {
       return next => async ctx => {
         // console.log('USERS', ctx.Message.users)
-        const users = []
+        if (this.__excluded(ctx.Bridge.name, ctx.Bridge.driverName)) return next(ctx)
         let state
+        const users = []
         const senderId = mt.extract('Message.sender.id', ctx, -1)
         const selfAction = ctx.Message.users.length && ctx.Message.users[0].id === senderId
-        const chat = await this.__saveChat(ctx).catch(e => console.error('SAVE BOTCMS CHAT FAILURE:', e))
-        const senderMember = await this.__saveUser(ctx, senderId).catch(e => console.error('SAVE BOTCMS USER FAILURE:', e))
+        const userIds = [senderId]
+
         if (ctx.Message.event === 'chatMemberNew' && selfAction) state = 'member'
         if (ctx.Message.event === 'chatMemberLeft' && selfAction) state = 'left'
-        if (mt.extract('mvlBotCMSChat.id', ctx.singleSession, -1) === -1) ctx.state.mvlBotCMSChat = chat
-        if (mt.extract('mvlBotCMSUser.id', ctx.singleSession, -1) === -1) {
-          ctx.singleSession.mvlBotCMSUser = senderMember.user
-          ctx.singleSession.mvlBotCMSUsers = [senderMember.user]
-          ctx.singleSession.mvlBotCMSChatMember = await this.__saveMember(ctx, chat, senderMember.user, senderMember.memberState || state)
+
+        const { userMember, chat, member } = await this.__saveAll(ctx, senderId, true, true, state)
+        const senderMember = userMember
+
+        if (mt.extract('mvlBotCMSChat.id', ctx.state, -1) === -1) ctx.state.mvlBotCMSChat = chat
+        if (mt.extract('mvlBotCMSUser.id', ctx.state, -1) === -1) {
+          ctx.state.mvlBotCMSUser = senderMember.user
+          ctx.state.mvlBotCMSUsers = [senderMember.user]
+          ctx.state.mvlBotCMSChatMember = member
         }
+
         if (ctx.Message.event === 'chatMemberNew') state = 'member'
         if (ctx.Message.event === 'chatMemberLeft') state = 'left'
+
         for (const botUser of ctx.Message.users) {
-          if (botUser.id === senderMember.id) continue
-          users.push((async () => {
-            const chatUser = await this.__saveUser(ctx, botUser.id)
-            await this.__saveMember(ctx, chat, chatUser.user, chatUser.memberState || state)
-            ctx.singleSession.mvlBotCMSUsers.push(chatUser.user)
-          })())
+          if (botUser.id === senderMember.id || userIds.indexOf(botUser.id) > -1) continue
+          userIds.push(botUser.id)
+          users.push(
+            (async () => {
+              const { userMember } = await this.__saveAll(ctx, botUser.id, false, true, state)
+              ctx.state.mvlBotCMSUsers.push(userMember.user)
+            })()
+          )
+        }
+        for (const mentionUser of ctx.Message.elements.mentionId()) {
+          if (mentionUser.id === senderMember.id || userIds.indexOf(mentionUser.id) > -1) continue
+          userIds.push(mentionUser.id)
+          users.push(
+            (async () => {
+              const { userMember } = await this.__saveAll(ctx, mentionUser.id, false, false)
+              const username = userMember.user.username
+              if (typeof username === 'string' && username.length) mentionUser.username = username.length
+              ctx.state.mvlBotCMSUsers.push(userMember.user)
+            })()
+          )
         }
         await Promise.allSettled(users)
         return next(ctx)
@@ -89,14 +116,34 @@ class mvlBotCMSUsersMiddleware {
     this.bridgeExec = (target) => {
       return next => async (execParams, logParams = {}) => {
         console.log('BOT USERS MW. BRIDGE EXEC.')
+        // console.log('BOT USERS MW. BRIDGE:', execParams.bridge)
+        // console.log('BOT USERS MW. BRIDGE EXEC. EXEC PARAMS:', execParams)
+        if (this.__excluded(execParams.bridge)) {
+          console.log('BOT USERS MW. BRIDGE EXCLUDED.')
+          return next(execParams, logParams)
+        }
         if (this.config.userMethods.indexOf(execParams.method) !== -1) {
           if (await target.DB.models.mvlBotCMSChat.count({ where: { chatId: String(execParams.params.peerId), state: 'active' } })) {
             return next(execParams, logParams)
           }
           console.error('BOTCMS USERS MW. BOT CHAT', execParams.params.peerId, 'IS NOT ACTIVE. BREAK SENDING. MESSAGE:\n', execParams.params.message)
+          return
         }
         return await next(execParams, logParams)
       }
+    }
+
+    this.__saveAll = async (ctx, userId, saveChat = true, saveMember = true, defMemberState = 'active') => {
+      const userMember = await this.__saveUser(ctx, userId)
+        .catch(e => console.error('SAVE BOTCMS USER FAILURE:', e))
+      const chat = saveChat
+        ? await this.__saveChat(ctx)
+          .catch(e => console.error('SAVE BOTCMS CHAT FAILURE:', e))
+        : { id: null, chatId: ctx.Message.chat.id }
+      const member = saveMember
+        ? await this.__saveMember(ctx, chat, userMember.user, userMember.memberState || defMemberState)
+        : {}
+      return { userMember, chat, member }
     }
 
     /**
@@ -144,7 +191,7 @@ class mvlBotCMSUsersMiddleware {
       }
       if (mt.empty(localUser) || this.__isOld(localUser.updatedAt) || localUser.fullname === null) {
         const userInfo = await ctx.Bridge.fetchUserInfo(requestUserId, ctx)
-        console.log(userInfo)
+        // console.log(userInfo)
         if (!mt.empty(userInfo) && userInfo.id !== undefined) {
           localUser = await this.DB.models.mvlBotCMSUser.findOne({
             where: {
@@ -203,10 +250,11 @@ class mvlBotCMSUsersMiddleware {
       }
       const fetchChatInfo = async (chatId, context) => {
         // console.log('SAVE CHAT. CHAT ID', chatId)
-        const chatInfo = await ctx.Bridge.fetchChatInfo(chatId, context).catch((e) => {
-          console.error('BC USERS MW. FETCH CHAT INFO ERROR', e)
-          return { id: null }
-        })
+        const chatInfo = await ctx.Bridge.fetchChatInfo(chatId, context)
+        //   .catch((e) => {
+        //   console.error('BC USERS MW. FETCH CHAT INFO ERROR', e)
+        //   return { id: null }
+        // })
         return {
           chatId: chatInfo.id,
           username: mt.extract('username', chatInfo, null),
@@ -301,13 +349,22 @@ class mvlBotCMSUsersMiddleware {
      */
     this.__saveMember = async (ctx, chat, user, state) => {
       if (!mt.empty(user) && user.id !== -1 && !mt.empty(chat) && chat.id !== -1) {
-        // console.log(ctx.singleSession.mvlBotCMSUser);
-        const result = await this.DB.models.mvlBotCMSChatMember.findOrCreate({
+        // console.log(ctx.state.mvlBotCMSUser);
+        const finder = {
           where: {
-            mvlBotCMSUserId: user.id,
-            mvlBotCMSChatId: chat.id
+            mvlBotCMSUserId: user.id
           }
-        }).catch(e => {
+        }
+        if (chat.id !== null) finder.where.mvlBotCMSChatId = chat.id
+        else if (!mt.empty(chat.chatId)) {
+          finder.include = [
+            {
+              model: this.DB.models.mvlBotCMSChat,
+              where: { chatId: String(chat.chatId) }
+            }
+          ]
+        }
+        const result = await this.DB.models.mvlBotCMSChatMember.findOrCreate(finder).catch(e => {
           console.error('ERROR WHILE UPDATE CHAT MEMBER', e, user.get())
           return [null]
         })
@@ -348,6 +405,16 @@ class mvlBotCMSUsersMiddleware {
         state = this.STATES.MIGRATED
       }
       return state
+    }
+
+    this.__excluded = (bridge, driver = undefined) => {
+      // console.log('MVL BOTCMS USERS. EXCLUDED? DRIVER: ', driver, '(conf:', this.config.exclude.drivers, ') BRIDGE:', bridge, '(conf:', this.config.exclude.bridges, ')')
+      if (driver !== undefined && this.config.exclude.drivers.indexOf(driver) !== -1) return true
+      if (bridge === null || bridge === undefined) {
+        const botBridge = this.BotCMS.getBridge()
+        if (botBridge !== null && typeof botBridge === 'object') bridge = botBridge.name
+      }
+      return this.config.exclude.bridges.indexOf(bridge) !== -1
     }
   }
 }

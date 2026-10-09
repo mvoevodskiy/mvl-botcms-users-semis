@@ -103,7 +103,7 @@ class mvlBotCMSUsersMiddleware {
             (async () => {
               const { userMember } = await this.__saveAll(ctx, mentionUser.id, false, false)
               const username = userMember.user.username
-              if (typeof username === 'string' && username.length) mentionUser.username = username.length
+              if (typeof username === 'string' && username.length) mentionUser.username = username
               ctx.state.mvlBotCMSUsers.push(userMember.user)
             })()
           )
